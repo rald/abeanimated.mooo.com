@@ -28,7 +28,10 @@ let buttons;
 
 // Loading state variables
 let isLoading = true;
-let loadProgress = 0; // 0.0 to 1.0
+let loadProgress = 0; // Actual progress (0.0 to 1.0)
+let displayProgress = 0; // Smoothly interpolated progress for visual smoothness
+let minLoadingTime = 1000; // Minimum time in milliseconds to show loading screen (1 second)
+let loadStartTime = 0;
 
 function rnd(n) {
 	return Math.floor(Math.random() * n);
@@ -76,6 +79,7 @@ function shuffleString(str) {
 async function setup() {
 	await new Canvas(256, 384);
 	displayMode("MAXED");
+	loadStartTime = millis();
 
 	const totalAssets = 6;
 	let loadedAssets = 0;
@@ -130,6 +134,18 @@ async function setup() {
 function drawLoadingScreen() {
 	background(palette[0]);
 
+	// Smoothly interpolate visual progress towards actual progress or time elapsed
+	let elapsedTime = millis() - loadStartTime;
+	let timeProgress = constrain(elapsedTime / minLoadingTime, 0, 1);
+	
+	// Ensure the progress bar respects both asset loading and the minimum display duration
+	let targetProgress = Math.min(loadProgress, timeProgress);
+	if (loadProgress >= 1.0) {
+		targetProgress = timeProgress; // Let time finish out the last bit smoothly if assets loaded instantly
+	}
+
+	displayProgress = lerp(displayProgress, targetProgress, 0.1);
+
 	const barWidth = 160;
 	const barHeight = 16;
 	const barX = (width - barWidth) / 2;
@@ -146,9 +162,10 @@ function drawLoadingScreen() {
 
 	noStroke();
 	fill(palette[5]);
-	rect(barX + 2, barY + 2, (barWidth - 4) * loadProgress, barHeight - 4, 2);
+	rect(barX + 2, barY + 2, (barWidth - 4) * displayProgress, barHeight - 4, 2);
 
-	if (loadProgress >= 1.0) {
+	// Finish loading once both assets are loaded AND minimum timer has passed
+	if (loadProgress >= 1.0 && elapsedTime >= minLoadingTime) {
 		isLoading = false;
 	}
 }
@@ -187,7 +204,6 @@ function draw() {
 }
 
 function windowResized() {
-	// Re-apply displayMode on resize if needed to adjust letterboxing dynamically
 	displayMode("MAXED");
 }
 
