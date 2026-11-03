@@ -30,25 +30,45 @@
 
 				<br/><br/>
 
-<table>
+<table cellspacing="16">
 	<tr>
 		<td>Abe1 - Sliding Puzzle</td>
-		<td><a href="videos/abe1.mp4" target="_blank"><img src="videos/mp4.png" width="32" height="32" style="vertical-align:middle;"/></a></td>
-		<td><a href="abe1" target="_blank"><img src="videos/joystick.png" width="32" height="32" style="vertical-align:middle;"/></a></td>
+		<td><a href="videos/abe1.mp4" target="_blank"><img src="videos/mp4.png" width="32" height="32" alt="preview" style="vertical-align:middle;"/></a></td>
+		<td><a href="abe1" target="_blank"><img src="videos/joystick.png" width="32" height="32" alt="play" style="vertical-align:middle;"/></a></td>
 	</tr>
 	<tr>
 		<td>Abe2 - Box World (sokoban)</td>
-		<td><a href="videos/abe2.mp4" target="_blank"><img src="videos/mp4.png" width="32" height="32" style="vertical-align:middle;"/></a></td>
-		<td><a href="abe2" target="_blank"><img src="videos/joystick.png" width="32" height="32" style="vertical-align:middle;"/></a></td>
+		<td><a href="videos/abe2.mp4" target="_blank"><img src="videos/mp4.png" width="32" height="32" alt="preview" style="vertical-align:middle;"/></a></td>
+		<td><a href="abe2" target="_blank"><img src="videos/joystick.png" width="32" height="32" alt="play" style="vertical-align:middle;"/></a></td>
 	</tr>
 	<tr>
 		<td>Abe3 - Star World (robozzle)</td>
-		<td><a href="videos/abe3.mp4" target="_blank"><img src="videos/mp4.png" width="32" height="32" style="vertical-align:middle;"/></a></td>
-		<td><a href="abe3" target="_blank"><img src="videos/joystick.png" width="32" height="32" style="vertical-align:middle;"/></a></td>
+		<td><a href="videos/abe3.mp4" target="_blank"><img src="videos/mp4.png" width="32" height="32" alt="preview" style="vertical-align:middle;"/></a></td>
+		<td><a href="abe3" target="_blank"><img src="videos/joystick.png" width="32" height="32" alt="play" style="vertical-align:middle;"/></a></td>
 	</tr>
 </table>
 
 			</center>
 		</div>
+
+		<script src="https://louisabraham.github.io/nekojs/neko.js" data-autostart></script>
+
+		<script>
+			const neko = createNeko({
+			  speed: 24,                 // Pixels per logic tick (default: 24, 5 ticks/sec)
+			  fps: 120,                  // Render frame rate (default: 120)
+			  behaviorMode: 0,           // 0=chase, 1=run away, 2=random, 3=pace, 4=ball chase
+			  idleThreshold: 6,          // Distance to consider idle (default: 6)
+			  allowBehaviorChange: true, // Click to cycle behaviors (default: true)
+			  startX: 0,                 // Initial X position (default: 0)
+			  startY: 0                  // Initial Y position (default: 0)
+			});
+
+			neko.start();
+			neko.stop();
+			neko.destroy();
+
+		</script>
+
 	</body>
 </html>
