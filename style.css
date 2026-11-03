@@ -1,0 +1,17 @@
+body {
+  background-color: #29366f;
+  color: #f4f4f4;
+  font-family: sans;
+}
+
+a { color: #41a6f6; }
+a:hover { color: #f4f4f4; }
+
+div.container {
+	margin: 0 auto;
+	max-width: 800px;
+}
+
+div.post {
+	border: 1px solid #f4f4f4;
+}
