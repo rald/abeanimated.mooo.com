@@ -1,17 +1,10 @@
-import palette from './palette.js';
+function Peg(x, y, d) {
+    this.x = x;
+    this.y = y;
+    this.d = d;
+}
 
-export default class Peg {
-
-	constructor(x, y, d) {
-		this.x = x;
-		this.y = y;
-		this.d = d;
-	}
-
-	draw() {
-		fill(palette[4]);
-		stroke(palette[12]);
-		circle(this.x, this.y, this.d);
-	}
-
+Peg.prototype.draw = function(ctx) {
+	Graphics.fillCircle(ctx,this.x,this.y,this.d/2,palette[5]);
+	Graphics.drawCircle(ctx,this.x,this.y,this.d/2,palette[12]);
 }

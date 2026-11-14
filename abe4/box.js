@@ -1,17 +1,13 @@
-import palette from './palette.js';
+Box=function(x,y,s) {
+    this.x = x;
+    this.y = y;
+    this.s = s;
+}
 
-export default class Box {
+Box.prototype.draw = function(ctx) {
+	ctx.fillStyle = palette[10];
+	ctx.fillRect(this.x-this.s/2,this.y-this.s/2,this.s,this.s);
 
-	constructor(x, y, s) {
-		this.x = x;
-		this.y = y;
-		this.s = s;
-	}
-
-	draw() {
-		fill(palette[10]);
-		stroke(palette[12]);
-		square(this.x - this.s / 2, this.y - this.s / 2, this.s);
-	}
-
+	ctx.strokeStyle = palette[12];
+	ctx.strokeRect(this.x-this.s/2,this.y-this.s/2,this.s,this.s);
 }

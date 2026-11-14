@@ -1,72 +1,64 @@
-import palette from './palette.js';
+Button = function(img, x, y, w, h) {
 
-export const ButtonState = Object.freeze({
-	UP: 'up',
-	DOWN: 'down'
-});
+	this.ButtonState = {
+	    UP: "UP",
+		OVER: "OVER",
+	    DOWN: "DOWN"
+	};
 
-export default class Button {
-
-	constructor(img, x, y, s) {
-		this.img = img;
-		this.x = x;
-		this.y = y;
-		this.s = s;
-		this.state = ButtonState.UP;
-		
-		// Internal tracking variables for click detection
-		this.isPressedInside = false;
-		this.wasMousePressed = false;
-	}
-
-	draw() {
-		if (this.state === ButtonState.DOWN) {
-			fill(palette[11]);
-			stroke(palette[12]);
-		} else {
-			fill(palette[10]);
-			stroke(palette[12]);
-		}
-
-		square(this.x - this.s / 2, this.y - this.s / 2, this.s, 8);
-		
-		imageMode(CENTER);
-		image(this.img, this.x, this.y);
-	}
-	
-	handleEvents() {
-		let currentlyInside = this.inrect();
-		let clicked = false;
-
-		if (mouseIsPressed) {
-			// If mouse just went down while inside, mark that the press started here
-			if (currentlyInside && !this.wasMousePressed) {
-				this.isPressedInside = true;
-			}
-			
-			// Visual state is DOWN only if pressed and currently hovering inside
-			if (this.isPressedInside && currentlyInside) {
-				this.state = ButtonState.DOWN;
-			} else {
-				this.state = ButtonState.UP;
-			}
-		} else {
-			// Mouse is released. If it started and ended inside, it's a valid click!
-			if (this.isPressedInside && currentlyInside) {
-				clicked = true;
-			}
-			this.isPressedInside = false;
-			this.state = ButtonState.UP;
-		}
-
-		this.wasMousePressed = mouseIsPressed;
-		return clicked; // Returns true on the exact frame a full click completes
-	}
-	
-	inrect() {
-		let rx = this.x - this.s / 2;
-		let ry = this.y - this.s / 2;
-		return mouseX >= rx && mouseX <= rx + this.s && mouseY >= ry && mouseY <= ry + this.s;
-	}
-
+    this.img = img;
+    this.w = w;
+    this.h = h;
+    this.x = x;
+    this.y = y;
+    this.state = this.ButtonState.UP;
+    this.isPressed = false;
+    this.isClicked = false;
 }
+
+Button.prototype.handleEvents = function(pointer) {
+    var isInside = inrect(pointer.x, pointer.y, this.x, this.y, this.w, this.h);
+    this.isClicked = false;
+
+    if (pointer.isDown) {
+        if (isInside && !this.isPressed && this.state !== this.ButtonState.DOWN) {
+            this.isPressed = true;
+        }
+        if (this.isPressed && isInside) {
+            this.state = this.ButtonState.DOWN;
+        } else {
+            this.state = isInside ? this.ButtonState.OVER : this.ButtonState.UP;
+        }
+    } else {
+        if (this.isPressed && isInside) {
+            this.isClicked = true;
+        }
+        this.isPressed = false;
+        this.state = isInside ? this.ButtonState.OVER : this.ButtonState.UP;
+    }
+};
+
+Button.prototype.draw = function(ctx) {
+	switch(this.state) {
+		case this.ButtonState.UP:
+		    ctx.fillStyle = palette[10];
+		break;
+		case this.ButtonState.OVER:
+		    ctx.fillStyle = palette[9];
+		break;
+		case this.ButtonState.DOWN:
+		    ctx.fillStyle = palette[10];
+		break;
+	}
+
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+
+    ctx.strokeStyle = palette[12];
+    ctx.strokeRect(this.x, this.y, this.w, this.h);
+
+    if (this.img) {
+        var cx = this.x + (this.w - this.img.width) / 2;
+        var cy = this.y + (this.h - this.img.height) / 2;
+        ctx.drawImage(this.img, cx, cy, this.img.width, this.img.height);
+    }
+};

@@ -1,66 +1,74 @@
-import palette from './palette.js';
+Ball=function(font,letter, x, y, d) {
+	this.BallState = {
+	    UP: "UP",
+		OVER: "OVER",
+	    DOWN: "DOWN"
+	};
 
-export default class Ball {
+	this.font=font;
 
-	constructor(letter, textSize, x, y, d) {
-		this.letter = letter;
-		this.x = x;
-		this.y = y;
-		this.startX = x;
-		this.startY = y;
-		this.targetX = x;
-		this.targetY = y;
-		this.d = d;
-		this.textSize = textSize;
-		this.used = false;
+    this.letter = letter.toUpperCase();
+    this.x = x;
+    this.y = y;
+    this.d = d;
+    this.targetX = x;
+    this.targetY = y;
+    this.state = this.BallState.UP;
+	this.isPressed=false;
+	this.isClicked=false;
+    this.isUsed=false;
+    this.containerIndex=-1;
+}
 
-		this.isAnimating = false;
-		this.animProgress = 1;
-		this.animDuration = 0.3; // Duration of the shuffle animation in seconds (e.g., 300ms)
-		this.animTime = 0;
+Ball.prototype.moveTo = function(x,y) {
+    this.targetX=x;
+    this.targetY=y;
+};
+
+Ball.prototype.update = function() {
+    // Smoothly interpolate current position toward target position
+    this.x += (this.targetX - this.x) * 0.2;
+    this.y += (this.targetY - this.y) * 0.2;
+};
+
+Ball.prototype.handleEvents = function(pointer) {
+    var isInside = incirc(pointer.x, pointer.y, this.x, this.y, this.d/2);
+    this.isClicked = false;
+
+    if (pointer.isDown) {
+        if (isInside && !this.isPressed && this.state !== this.BallState.DOWN) {
+            this.isPressed = true;
+        }
+        if (this.isPressed && isInside) {
+            this.state = this.BallState.DOWN;
+        } else {
+            this.state = isInside ? this.BallState.OVER : this.BallState.UP;
+        }
+    } else {
+        if (this.isPressed && isInside) {
+            this.isClicked = true;
+        }
+        this.isPressed = false;
+        this.state = isInside ? this.BallState.OVER : this.BallState.UP;
+    }
+};
+
+Ball.prototype.draw = function(ctx) {
+	var backgroundColor = palette[10];
+
+	switch(this.state) {
+		case this.BallState.UP:
+		    backgroundColor = palette[10];
+		break;
+		case this.BallState.OVER:
+		    backgroundColor = palette[9];
+		break;
+		case this.BallState.DOWN:
+		    backgroundColor = palette[10];
+		break;
 	}
 
-	moveTo(targetX, targetY) {
-		this.startX = this.x;
-		this.startY = this.y;
-		this.targetX = targetX;
-		this.targetY = targetY;
-		this.animTime = 0;
-		this.animProgress = 0;
-		this.isAnimating = true;
-	}
-
-	update() {
-		if (this.isAnimating) {
-			// deltaTime is in milliseconds; convert to seconds
-			// Fallback to 1/60th of a second if deltaTime is undefined on the first frame
-			let dt = (typeof deltaTime !== 'undefined' ? deltaTime : 16.67) / 1000;
-			
-			this.animTime += dt;
-			this.animProgress = this.animTime / this.animDuration;
-
-			if (this.animProgress >= 1) {
-				this.animProgress = 1;
-				this.isAnimating = false;
-			}
-			
-			// Smooth ease-out curve
-			let ease = 1 - Math.pow(1 - this.animProgress, 3);
-			this.x = lerp(this.startX, this.targetX, ease);
-			this.y = lerp(this.startY, this.targetY, ease);
-		}
-	}
-
-	draw() {
-		this.update();
-
-		stroke(palette[12]);
-		fill(palette[10]);
-		circle(this.x, this.y, this.d);
-		fill(palette[12]);
-		textAlign(CENTER, MIDDLE);
-		textSize(this.textSize);
-		text(this.letter, this.x, this.y);
-	}
-
+	Graphics.fillCircle(ctx,this.x,this.y,this.d/2,backgroundColor);
+	Graphics.drawCircle(ctx,this.x,this.y,this.d/2,palette[12]);
+	this.font.fillText(ctx,this.letter,this.x,this.y,palette[12]);
 }
