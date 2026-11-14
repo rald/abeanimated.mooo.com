@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Abe's Zombie Attack</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #111827;
+      font-family: 'Fredoka', sans-serif;
+    }
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #hud-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    /* Overhead 3D Projected Health Bars */
+    .hp-tag {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      will-change: transform, left, top;
+    }
+    .hp-name {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #ffffff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
+      margin-bottom: 2px;
+      white-space: nowrap;
+    }
+    .hp-bar-outer {
+      width: 68px;
+      height: 9px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1.5px solid rgba(255, 255, 255, 0.85);
+      border-radius: 999px;
+      padding: 1px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.55);
+      position: relative;
+      overflow: hidden;
+    }
+    .hp-bar-outer.player-bar {
+      width: 82px;
+      height: 11px;
+      border-color: #38bdf8;
+    }
+    .hp-bar-outer.brute-bar {
+      width: 86px;
+      height: 10px;
+      border-color: #f97316;
+    }
+    .hp-bar-trail {
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      bottom: 1px;
+      background: #f8fafc;
+      border-radius: 999px;
+      transition: width 0.28s ease-out;
+    }
+    .hp-bar-fill {
+      position: relative;
+      height: 100%;
+      border-radius: 999px;
+      background: #22c55e;
+      transition: width 0.08s linear, background-color 0.2s ease;
+    }
+    /* Floating Damage & Status Numbers */
+    .dmg-float {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      pointer-events: none;
+      text-shadow: 0 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+      animation: floatUpFade 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: transform, opacity;
+    }
+    @keyframes floatUpFade {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -20%) scale(0.65);
+      }
+      18% {
+        opacity: 1;
+        transform: translate(-50%, -65%) scale(1.18);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -165%) scale(0.95);
+      }
+    }
+    /* Interactive UI panels */
+    .pointer-auto {
+      pointer-events: auto;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    }
+    .btn-arcade {
+      transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.15s ease;
+    }
+    .btn-arcade:hover {
+      filter: brightness(1.08);
+      transform: translateY(-2px);
+    }
+    .btn-arcade:active {
+      transform: translateY(2px);
+    }
+    /* Wave Banner Animation */
+    @keyframes bannerPop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+      15% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+      25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -65%) scale(0.95); }
+    }
+    .wave-banner-anim {
+      animation: bannerPop 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    /* Touch Joystick */
+    #joystick-zone {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      width: 124px;
+      height: 124px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      display: none;
+    }
+    #joystick-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 48px;
+      height: 48px;
+      margin-top: -24px;
+      margin-left: -24px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.75);
+      border: 2px solid #ffffff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    #mobile-attack-btn {
+      position: absolute;
+      bottom: 34px;
+      right: 28px;
+      width: 88px;
+      height: 88px;
+      border-radius: 999px;
+      display: none;
+    }
+    @media (pointer: coarse), (max-width: 768px) {
+      #joystick-zone { display: block; }
+      #mobile-attack-btn { display: flex; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <!-- Three.js Canvas Mount -->
+    <div id="canvas-mount" class="w-full h-full"></div>
+
+    <!-- 2D Overlay for Overhead Life Meters, Damage Popups & HUD -->
+    <div id="hud-layer">
+      <!-- Dynamic Overhead Health Bars Container -->
+      <div id="health-bars-container"></div>
+
+      <!-- Dynamic Floating Damage Popups Container -->
+      <div id="damage-popups-container"></div>
+
+      <!-- Top Bar HUD -->
+      <div class="absolute top-0 left-0 right-0 p-3 sm:p-5 flex flex-wrap items-start justify-between gap-3">
+        <!-- Left: Wave & Kills -->
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <div class="glass-panel rounded-2xl px-4 py-2 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-rose-400 font-bold text-lg">
+              🧟
+            </div>
+            <div>
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Wave</div>
+              <div id="hud-wave" class="text-xl sm:text-2xl font-bold text-white leading-none">1</div>
+            </div>
+          </div>
+
+          <div class="glass-panel rounded-2xl px-4 py-2 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400 font-bold text-lg">
+              ⚔️
+            </div>
+            <div>
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Defeated</div>
+              <div id="hud-kills" class="text-xl sm:text-2xl font-bold text-white leading-none">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center: Combo Pill (Hidden when 0) -->
+        <div id="combo-badge" class="hidden glass-panel rounded-2xl px-4 py-1.5 border-amber-400/50 bg-amber-500/20 text-center transform transition-transform">
+          <div id="combo-count" class="text-lg sm:text-xl font-extrabold text-amber-300 leading-tight">3x COMBO!</div>
+          <div class="text-[10px] uppercase tracking-widest text-amber-100/80 font-bold">Bonus Multiplier</div>
+        </div>
+
+        <!-- Right: Score, Camera Angle & Audio Controls -->
+        <div class="flex items-center gap-2 sm:gap-3 ml-auto">
+          <div class="glass-panel rounded-2xl px-4 py-2 text-right">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Score</div>
+            <div id="hud-score" class="text-xl sm:text-2xl font-bold text-sky-300 leading-none font-mono">0</div>
+          </div>
+
+          <button id="btn-camera" title="Switch Camera View" class="pointer-auto btn-arcade glass-panel rounded-2xl p-3 text-slate-200 hover:text-white flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+
+          <button id="btn-mute" title="Toggle Sound" class="pointer-auto btn-arcade glass-panel rounded-2xl p-3 text-slate-200 hover:text-white flex items-center justify-center">
+            <svg id="icon-sound-on" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            </svg>
+            <svg id="icon-sound-off" class="w-6 h-6 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Wave Announcement Banner -->
+      <div id="wave-banner" class="hidden absolute top-1/4 left-1/2 pointer-events-none text-center z-20">
+        <div id="wave-banner-title" class="text-4xl sm:text-6xl font-extrabold text-white tracking-tight drop-shadow-[0_5px_5px_rgba(0,0,0,0.85)]">
+          WAVE 1
+        </div>
+        <div id="wave-banner-sub" class="text-sm sm:text-lg font-bold text-rose-300 uppercase tracking-widest mt-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+          Survive the Horde!
+        </div>
+      </div>
+
+      <!-- Bottom Desktop Controls Pill -->
+      <div class="hidden md:flex absolute bottom-4 left-1/2 -translate-x-1/2 glass-panel rounded-full px-5 py-2 items-center gap-5 text-xs text-slate-300 font-medium">
+        <span><strong class="text-white bg-slate-700/80 px-2 py-0.5 rounded-md border border-slate-600">WASD / Arrows</strong> Move</span>
+        <span><strong class="text-white bg-slate-700/80 px-2 py-0.5 rounded-md border border-slate-600">Shift</strong> Sprint</span>
+        <span><strong class="text-sky-300 bg-sky-950/80 px-2 py-0.5 rounded-md border border-sky-700">Space / Click</strong> 3-Hit Combo Attack</span>
+        <span><strong class="text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-700">Drag Mouse</strong> Orbit Camera</span>
+      </div>
+
+      <!-- Mobile Touch Controls -->
+      <div id="joystick-zone" class="pointer-auto">
+        <div id="joystick-knob"></div>
+      </div>
+      <button id="mobile-attack-btn" class="pointer-auto btn-arcade bg-gradient-to-br from-rose-500 to-orange-600 border-4 border-white/80 shadow-xl items-center justify-center text-white font-extrabold text-lg tracking-wider">
+        HIT!
+      </button>
+
+      <!-- Start Screen Overlay -->
+      <div id="start-screen" class="pointer-auto absolute inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-30">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-8 text-center border-2 border-sky-400/30">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-bold uppercase tracking-wider mb-3">
+            3D Low-Poly Survival Action
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mb-2">
+            BLOCKY <span class="text-rose-500">ZOMBIE</span> ATTACK
+          </h1>
+          <p class="text-slate-300 text-sm sm:text-base mb-6 leading-relaxed">
+            Armed with her trusty spiked bat and martial-arts kicks, guide our survivor through endless waves of shambling blocky zombies!
+          </p>
+
+          <div class="grid grid-cols-3 gap-2.5 mb-6 text-left">
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-2xl p-3">
+              <div class="text-sky-400 font-bold text-xs uppercase mb-1">1. Move</div>
+              <div class="text-slate-300 text-xs">WASD / Arrows + Shift to Sprint</div>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-2xl p-3">
+              <div class="text-amber-400 font-bold text-xs uppercase mb-1">2. Combo</div>
+              <div class="text-slate-300 text-xs">Space / Click: Right, Left &amp; Heavy Kick!</div>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-2xl p-3">
+              <div class="text-emerald-400 font-bold text-xs uppercase mb-1">3. Survive</div>
+              <div class="text-slate-300 text-xs">Collect green hearts dropped by zombies</div>
+            </div>
+          </div>
+
+          <button id="btn-start" class="btn-arcade w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-slate-950 font-extrabold text-xl tracking-wide shadow-lg shadow-emerald-500/25 border-2 border-white/40 cursor-pointer">
+            PLAY NOW
+          </button>
+        </div>
+      </div>
+
+      <!-- Game Over Overlay -->
+      <div id="gameover-screen" class="hidden pointer-auto absolute inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-30">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-8 text-center border-2 border-rose-500/40">
+          <div class="w-16 h-16 rounded-2xl bg-rose-500/20 border-2 border-rose-500/50 flex items-center justify-center text-3xl mx-auto mb-3">
+            💀
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-1">
+            OVERRUN!
+          </h2>
+          <p class="text-slate-400 text-sm mb-6">
+            The zombie horde finally caught up to you.
+          </p>
+
+          <div class="grid grid-cols-3 gap-3 mb-6">
+            <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-3">
+              <div class="text-[11px] uppercase text-slate-400 font-bold">Wave</div>
+              <div id="final-wave" class="text-2xl font-extrabold text-white mt-0.5">1</div>
+            </div>
+            <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-3">
+              <div class="text-[11px] uppercase text-slate-400 font-bold">Zombies</div>
+              <div id="final-kills" class="text-2xl font-extrabold text-rose-400 mt-0.5">0</div>
+            </div>
+            <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-3">
+              <div class="text-[11px] uppercase text-slate-400 font-bold">Score</div>
+              <div id="final-score" class="text-2xl font-extrabold text-sky-400 font-mono mt-0.5">0</div>
+            </div>
+          </div>
+
+          <button id="btn-restart" class="btn-arcade w-full py-4 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 text-white font-extrabold text-xl tracking-wide shadow-lg shadow-rose-500/30 border-2 border-white/30 cursor-pointer">
+            PLAY AGAIN
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * BLOCKY ZOMBIE ATTACK 3D - Complete Self-Contained Three.js Game
+     * Inspired by Kenney's Blocky Characters (character-female-a & undead horde)
+     * Features:
+     *  - Articulated 3D Blocky Rig (Head, Hair, Torso, Left/Right Arms, Left/Right Legs, Weapon)
+     *  - Procedural Keyframe-Style Animation Blending:
+     *      idle, walk, sprint, attack-melee-right, attack-melee-left, attack-kick, die
+     *  - Projected 2D Overhead Billboarded Life Meters over every character's head
+     *  - 3-Hit Combo System with Slash Trails, Hit-Stop, Knockback & Camera Shake
+     *  - Synthesized Web Audio API Sound Engine (No external audio dependencies)
+     * ============================================================================
+     */
+
+    // ----------------------------------------------------------------------------
+    // 1. WEB AUDIO SYNTHESIZER (Retro-Arcade Crisp Sound Effects)
+    // ----------------------------------------------------------------------------
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+
+      playSwing(comboStep = 1) {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = comboStep === 3 ? 'sawtooth' : 'triangle';
+        const baseFreq = comboStep === 1 ? 320 : comboStep === 2 ? 380 : 240;
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(95, now + 0.16);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      }
+
+      playHitZombie(isKick = false) {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        // Punchy impact thud
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = isKick ? 'square' : 'sine';
+        osc.frequency.setValueAtTime(isKick ? 190 : 155, now);
+        osc.frequency.exponentialRampToValueAtTime(42, now + 0.14);
+
+        gain.gain.setValueAtTime(0.28, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      }
+
+      playZombieDie() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.linearRampToValueAtTime(68, now + 0.28);
+
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.31);
+      }
+
+      playPlayerHurt() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(110, now + 0.22);
+
+        gain.gain.setValueAtTime(0.24, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+
+      playPickup() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.setValueAtTime(780, now + 0.08);
+
+        gain.gain.setValueAtTime(0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.23);
+      }
+
+      playWaveStart() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        [330, 440, 554].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+          gain.gain.setValueAtTime(0.15, now + idx * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.09);
+          osc.stop(now + idx * 0.09 + 0.26);
+        });
+      }
+    }
+
+    const sfx = new SoundFX();
+
+    // ----------------------------------------------------------------------------
+    // 2. KENNEY-STYLE BLOCKY CHARACTER RIG FACTORY
+    // ----------------------------------------------------------------------------
+    // Helper to create crisp procedural canvas textures for blocky faces & clothes
+    function createFaceTexture({ skinColor, eyeColor = '#1e293b', mouthType = 'smile', blush = false, scars = false }) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+
+      // Base skin fill
+      ctx.fillStyle = skinColor;
+      ctx.fillRect(0, 0, 128, 128);
+
+      // Subtle top shading
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      ctx.fillRect(0, 0, 128, 18);
+
+      if (blush) {
+        ctx.fillStyle = 'rgba(244, 114, 182, 0.45)';
+        ctx.fillRect(16, 72, 20, 10);
+        ctx.fillRect(92, 72, 20, 10);
+      }
+
+      // Blocky Eyes
+      ctx.fillStyle = eyeColor;
+      ctx.fillRect(28, 52, 18, 20);
+      ctx.fillRect(82, 52, 18, 20);
+
+      // Cute white eye glint for player
+      if (mouthType === 'smile') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(31, 55, 6, 6);
+        ctx.fillRect(85, 55, 6, 6);
+      }
+
+      // Eyebrows
+      ctx.fillStyle = '#334155';
+      if (mouthType === 'zombie') {
+        ctx.fillRect(24, 42, 24, 6);
+        ctx.fillRect(80, 44, 24, 6);
+      } else {
+        ctx.fillRect(26, 42, 20, 5);
+        ctx.fillRect(82, 42, 20, 5);
+      }
+
+      // Mouth
+      if (mouthType === 'smile') {
+        ctx.fillStyle = '#9f1239';
+        ctx.fillRect(52, 86, 24, 10);
+        ctx.fillStyle = '#fb7185';
+        ctx.fillRect(56, 90, 16, 6);
+      } else if (mouthType === 'zombie') {
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(44, 84, 40, 16);
+        // Zombie teeth
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(48, 84, 7, 6);
+        ctx.fillRect(68, 84, 7, 6);
+        ctx.fillRect(58, 94, 7, 6);
+      }
+
+      if (scars) {
+        ctx.fillStyle = '#4d7c0f';
+        ctx.fillRect(18, 24, 26, 6);
+        ctx.fillRect(84, 96, 22, 6);
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      return tex;
+    }
+
+    /**
+     * Builds an articulated Kenney-style blocky character rig.
+     * Pivot hierarchy matches standard humanoid rigs so animations (`idle`, `walk`,
+     * `sprint`, `attack-melee-right`, `attack-melee-left`, `attack-kick`, `die`)
+     * articulate cleanly from shoulders, hips, neck, and root pivot.
+     */
+    function createBlockyCharacterRig(options = {}) {
+      const {
+        isPlayer = false,
+        variant = 'normal', // 'normal', 'runner', 'brute'
+        scale = 1.0
+      } = options;
+
+      const root = new THREE.Group();
+      root.scale.setScalar(scale);
+
+      // Hip/Pelvis Pivot (allows full-body tilt, bounce, and `die` backward fall)
+      const bodyPivot = new THREE.Group();
+      bodyPivot.position.y = 0.72; // Hip height above ground
+      root.add(bodyPivot);
+
+      // Color Palettes
+      let skinHex = '#ffedd5';
+      let shirtHex = '#0ea5e9';
+      let pantsHex = '#1e293b';
+      let hairHex = '#7c2d12';
+      let shoeHex = '#f8fafc';
+
+      if (!isPlayer) {
+        if (variant === 'normal') {
+          skinHex = '#84cc16';
+          shirtHex = '#475569';
+          pantsHex = '#334155';
+          shoeHex = '#1e293b';
+        } else if (variant === 'runner') {
+          skinHex = '#a3e635';
+          shirtHex = '#dc2626';
+          pantsHex = '#1e293b';
+          shoeHex = '#facc15';
+        } else if (variant === 'brute') {
+          skinHex = '#4d7c0f';
+          shirtHex = '#581c87';
+          pantsHex = '#18181b';
+          shoeHex = '#09090b';
+        }
+      }
+
+      const skinMat = new THREE.MeshStandardMaterial({ color: skinHex, roughness: 0.65 });
+      const shirtMat = new THREE.MeshStandardMaterial({ color: shirtHex, roughness: 0.7 });
+      const pantsMat = new THREE.MeshStandardMaterial({ color: pantsHex, roughness: 0.75 });
+      const shoeMat = new THREE.MeshStandardMaterial({ color: shoeHex, roughness: 0.6 });
+      const hairMat = new THREE.MeshStandardMaterial({ color: hairHex, roughness: 0.7 });
+
+      // 1. TORSO (Blocky chest + waist)
+      const torsoGroup = new THREE.Group();
+      torsoGroup.position.y = 0.36;
+      bodyPivot.add(torsoGroup);
+
+      const torsoGeo = new THREE.BoxGeometry(0.68, 0.72, 0.38);
+      const torsoMesh = new THREE.Mesh(torsoGeo, shirtMat);
+      torsoMesh.castShadow = true;
+      torsoMesh.receiveShadow = true;
+      torsoGroup.add(torsoMesh);
+
+      // Player outfit detail: cute scarf/collar & belt
+      if (isPlayer) {
+        const collarMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.72, 0.14, 0.42),
+          new THREE.MeshStandardMaterial({ color: '#f43f5e', roughness: 0.5 })
+        );
+        collarMesh.position.y = 0.31;
+        torsoGroup.add(collarMesh);
+
+        const beltMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.71, 0.11, 0.41),
+          new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.4 })
+        );
+        beltMesh.position.y = -0.31;
+        torsoGroup.add(beltMesh);
+      } else {
+        // Zombie tattered ribs/stripe detail
+        const tearMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.7, 0.16, 0.4),
+          new THREE.MeshStandardMaterial({ color: skinHex, roughness: 0.8 })
+        );
+        tearMesh.position.set(0.05, -0.1, 0);
+        tearMesh.rotation.z = 0.12;
+        torsoGroup.add(tearMesh);
+      }
+
+      // 2. HEAD & HAIR (Kenney oversized cute blocky head)
+      const headPivot = new THREE.Group();
+      headPivot.position.y = 0.74;
+      bodyPivot.add(headPivot);
+
+      const faceTex = createFaceTexture({
+        skinColor: skinHex,
+        eyeColor: isPlayer ? '#0f172a' : '#fef08a',
+        mouthType: isPlayer ? 'smile' : 'zombie',
+        blush: isPlayer,
+        scars: !isPlayer
+      });
+
+      const headMaterials = [
+        skinMat, // right
+        skinMat, // left
+        isPlayer ? hairMat : skinMat, // top
+        skinMat, // bottom
+        new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.6 }), // front (+Z)
+        isPlayer ? hairMat : skinMat // back (-Z)
+      ];
+
+      const headGeo = new THREE.BoxGeometry(0.66, 0.64, 0.64);
+      const headMesh = new THREE.Mesh(headGeo, headMaterials);
+      headMesh.position.y = 0.32;
+      headMesh.castShadow = true;
+      headMesh.receiveShadow = true;
+      headPivot.add(headMesh);
+
+      // Character-Female-A stylized blocky hair (bangs, side locks & ponytail!)
+      if (isPlayer) {
+        const hairCap = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.22, 0.7), hairMat);
+        hairCap.position.set(0, 0.58, -0.02);
+        hairCap.castShadow = true;
+        headPivot.add(hairCap);
+
+        const hairBack = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.52, 0.18), hairMat);
+        hairBack.position.set(0, 0.32, -0.28);
+        hairBack.castShadow = true;
+        headPivot.add(hairBack);
+
+        // Cute High Ponytail
+        const ponytail = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.44, 0.26), hairMat);
+        ponytail.position.set(0, 0.42, -0.44);
+        ponytail.rotation.x = 0.35;
+        ponytail.castShadow = true;
+        headPivot.add(ponytail);
+
+        // Hair tie ribbon
+        const ribbon = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.12, 0.3),
+          new THREE.MeshStandardMaterial({ color: '#f43f5e' })
+        );
+        ribbon.position.set(0, 0.54, -0.38);
+        headPivot.add(ribbon);
+      }
+
+      // 3. LEFT & RIGHT ARMS (Shoulder Pivots)
+      function buildArm(isLeft) {
+        const shoulderPivot = new THREE.Group();
+        shoulderPivot.position.set(isLeft ? 0.47 : -0.47, 0.64, 0);
+        bodyPivot.add(shoulderPivot);
+
+        // Sleeve
+        const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.26, 0.26), shirtMat);
+        sleeve.position.y = -0.11;
+        sleeve.castShadow = true;
+        shoulderPivot.add(sleeve);
+
+        // Forearm / Hand
+        const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.42, 0.22), skinMat);
+        forearm.position.y = -0.42;
+        forearm.castShadow = true;
+        shoulderPivot.add(forearm);
+
+        return shoulderPivot;
+      }
+
+      const leftArm = buildArm(true);
+      const rightArm = buildArm(false);
+
+      // Player's Melee Weapon (Blocky Spiked Survivor Bat) attached to Right Hand
+      let weaponGroup = null;
+      let slashTrail = null;
+      if (isPlayer) {
+        weaponGroup = new THREE.Group();
+        weaponGroup.position.set(0, -0.56, 0.12);
+        weaponGroup.rotation.x = Math.PI * 0.42;
+        rightArm.add(weaponGroup);
+
+        const handle = new THREE.Mesh(
+          new THREE.BoxGeometry(0.1, 0.32, 0.1),
+          new THREE.MeshStandardMaterial({ color: '#78350f', roughness: 0.8 })
+        );
+        handle.position.y = 0.12;
+        weaponGroup.add(handle);
+
+        const batBody = new THREE.Mesh(
+          new THREE.BoxGeometry(0.16, 0.68, 0.16),
+          new THREE.MeshStandardMaterial({ color: '#d97706', roughness: 0.5 })
+        );
+        batBody.position.y = 0.58;
+        batBody.castShadow = true;
+        weaponGroup.add(batBody);
+
+        // Metallic reinforcement band + spikes
+        const band = new THREE.Mesh(
+          new THREE.BoxGeometry(0.19, 0.18, 0.19),
+          new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.6, roughness: 0.3 })
+        );
+        band.position.y = 0.78;
+        weaponGroup.add(band);
+
+        // Glowing Slash Arc Mesh (visible during melee swings)
+        const arcGeo = new THREE.RingGeometry(0.85, 1.55, 20, 1, -Math.PI * 0.35, Math.PI * 0.75);
+        const arcMat = new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0
+        });
+        slashTrail = new THREE.Mesh(arcGeo, arcMat);
+        slashTrail.rotation.x = -Math.PI / 2;
+        slashTrail.position.set(0, 0.45, 0.3);
+        bodyPivot.add(slashTrail);
+      }
+
+      // 4. LEFT & RIGHT LEGS (Hip Pivots)
+      function buildLeg(isLeft) {
+        const hipPivot = new THREE.Group();
+        hipPivot.position.set(isLeft ? 0.18 : -0.18, 0.02, 0);
+        bodyPivot.add(hipPivot);
+
+        const legMesh = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.56, 0.3), pantsMat);
+        legMesh.position.y = -0.28;
+        legMesh.castShadow = true;
+        hipPivot.add(legMesh);
+
+        const shoeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.18, 0.38), shoeMat);
+        shoeMesh.position.set(0, -0.63, 0.04);
+        shoeMesh.castShadow = true;
+        hipPivot.add(shoeMesh);
+
+        return hipPivot;
+      }
+
+      const leftLeg = buildLeg(true);
+      const rightLeg = buildLeg(false);
+
+      // Ground Contact Shadow Ring
+      const shadowRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.42, 0.56, 24),
+        new THREE.MeshBasicMaterial({
+          color: isPlayer ? 0x38bdf8 : 0x000000,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: isPlayer ? 0.55 : 0.25
+        })
+      );
+      shadowRing.rotation.x = -Math.PI / 2;
+      shadowRing.position.y = 0.02;
+      root.add(shadowRing);
+
+      return {
+        root,
+        bodyPivot,
+        torsoGroup,
+        headPivot,
+        leftArm,
+        rightArm,
+        leftLeg,
+        rightLeg,
+        weaponGroup,
+        slashTrail,
+        shadowRing,
+        meshes: [torsoMesh, headMesh],
+        originalColors: {
+          shirt: shirtHex,
+          skin: skinHex
+        }
+      };
+    }
+
+    // ----------------------------------------------------------------------------
+    // 3. PROCEDURAL KEYFRAME-STYLE ANIMATION CONTROLLER
+    // ----------------------------------------------------------------------------
+    /**
+     * Smoothly updates bone rotations and positions for any character rig
+     * based on current state (`idle`, `walk`, `sprint`, `attack-melee-right`,
+     * `attack-melee-left`, `attack-kick`, `die`) and normalized state progress.
+     */
+    function animateCharacterRig(entity, dt, elapsedTime) {
+      const { rig, state, stateTimer, stateDuration, speedRatio } = entity;
+      const t = elapsedTime + entity.animOffset;
+      const lerpRate = Math.min(1, dt * 16);
+
+      // Target transforms
+      let bodyY = 0.72;
+      let bodyRotX = 0;
+      let bodyRotY = 0;
+      let bodyRotZ = 0;
+      let torsoRotY = 0;
+      let headRotX = 0;
+      let headRotY = 0;
+      let lArmX = 0, lArmY = 0, lArmZ = 0.08;
+      let rArmX = 0, rArmY = 0, rArmZ = -0.08;
+      let lLegX = 0, lLegZ = 0;
+      let rLegX = 0, rLegZ = 0;
+
+      if (state === 'die') {
+        // Dramatic backward collapse onto the arena floor
+        const p = Math.min(1, stateTimer / 0.55);
+        const ease = 1 - Math.pow(1 - p, 3);
+        bodyRotX = -Math.PI * 0.48 * ease;
+        bodyY = 0.72 - 0.52 * ease;
+        lArmX = -0.5 * ease;
+        lArmZ = 0.55 * ease;
+        rArmX = -0.4 * ease;
+        rArmZ = -0.55 * ease;
+        lLegX = 0.25 * ease;
+        rLegX = 0.15 * ease;
+        headRotX = 0.3 * ease;
+      } else if (state === 'attack-melee-right') {
+        // Overhead/Horizontal heavy right-handed bat swing
+        const p = Math.min(1, stateTimer / stateDuration);
+        const swingCurve = Math.sin(p * Math.PI);
+        const followThrough = p < 0.45 ? (p / 0.45) : 1;
+
+        bodyY = 0.72 + Math.sin(p * Math.PI) * 0.08;
+        torsoRotY = THREE.MathUtils.lerp(-0.65, 0.85, followThrough);
+        bodyRotX = 0.14 * swingCurve;
+
+        // Right arm winds up then slashes across
+        rArmX = THREE.MathUtils.lerp(-2.2, -0.45, followThrough);
+        rArmZ = THREE.MathUtils.lerp(-0.4, 0.65, followThrough);
+        rArmY = THREE.MathUtils.lerp(-0.4, 0.9, followThrough);
+
+        // Left arm balances back
+        lArmX = 0.45 * swingCurve;
+        lArmZ = 0.35;
+
+        // Stride stance
+        lLegX = -0.35 * swingCurve;
+        rLegX = 0.35 * swingCurve;
+
+        if (rig.slashTrail) {
+          rig.slashTrail.material.color.setHex(0x38bdf8);
+          rig.slashTrail.material.opacity = p > 0.2 && p < 0.75 ? Math.sin(((p - 0.2) / 0.55) * Math.PI) * 0.85 : 0;
+          rig.slashTrail.rotation.z = THREE.MathUtils.lerp(-1.2, 1.4, p);
+        }
+      } else if (state === 'attack-melee-left') {
+        // Backhand left-to-right cross slash
+        const p = Math.min(1, stateTimer / stateDuration);
+        const swingCurve = Math.sin(p * Math.PI);
+        const followThrough = p < 0.45 ? (p / 0.45) : 1;
+
+        bodyY = 0.72 + Math.sin(p * Math.PI) * 0.09;
+        torsoRotY = THREE.MathUtils.lerp(0.85, -0.85, followThrough);
+        bodyRotX = 0.16 * swingCurve;
+
+        // Right arm sweeps across in reverse arc
+        rArmX = -1.15;
+        rArmY = THREE.MathUtils.lerp(0.95, -0.95, followThrough);
+        rArmZ = THREE.MathUtils.lerp(0.6, -0.5, followThrough);
+
+        lArmX = -0.4 * swingCurve;
+        lArmZ = 0.45;
+
+        lLegX = 0.38 * swingCurve;
+        rLegX = -0.38 * swingCurve;
+
+        if (rig.slashTrail) {
+          rig.slashTrail.material.color.setHex(0xf472b6);
+          rig.slashTrail.material.opacity = p > 0.2 && p < 0.75 ? Math.sin(((p - 0.2) / 0.55) * Math.PI) * 0.85 : 0;
+          rig.slashTrail.rotation.z = THREE.MathUtils.lerp(1.4, -1.4, p);
+        }
+      } else if (state === 'attack-kick') {
+        // High martial-arts roundhouse/front kick with heavy knockback!
+        const p = Math.min(1, stateTimer / stateDuration);
+        const kickExtension = Math.sin(p * Math.PI);
+
+        bodyY = 0.72 + kickExtension * 0.12;
+        bodyRotX = -0.28 * kickExtension; // Lean back for balance
+        torsoRotY = -0.45 * kickExtension;
+
+        // Right leg kicks high forward!
+        rLegX = -1.65 * kickExtension;
+        rLegZ = -0.18 * kickExtension;
+
+        // Planted left leg
+        lLegX = 0.22 * kickExtension;
+
+        // Guard arms up
+        lArmX = -0.85 * kickExtension;
+        lArmZ = 0.35;
+        rArmX = -0.65 * kickExtension;
+        rArmZ = -0.35;
+
+        if (rig.slashTrail) {
+          rig.slashTrail.material.color.setHex(0xfbbf24);
+          rig.slashTrail.material.opacity = kickExtension * 0.8;
+          rig.slashTrail.rotation.z = p * 3.5;
+        }
+      } else if (state === 'zombie-attack') {
+        // Zombie double-arm lunge & chomp
+        const p = Math.min(1, stateTimer / stateDuration);
+        const lunge = Math.sin(p * Math.PI);
+
+        bodyY = 0.72 + lunge * 0.08;
+        bodyRotX = 0.32 * lunge;
+        headRotX = -0.25 * lunge;
+
+        // Arms raise high then slam down
+        const armAngle = p < 0.4 ? THREE.MathUtils.lerp(-1.45, -2.35, p / 0.4) : THREE.MathUtils.lerp(-2.35, -0.75, (p - 0.4) / 0.6);
+        lArmX = armAngle;
+        rArmX = armAngle;
+        lArmZ = 0.15;
+        rArmZ = -0.15;
+
+        lLegX = -0.3 * lunge;
+        rLegX = 0.3 * lunge;
+      } else {
+        // Movement states: `idle`, `walk`, `sprint`
+        if (rig.slashTrail) {
+          rig.slashTrail.material.opacity = 0;
+        }
+
+        if (speedRatio > 0.08) {
+          const isSprinting = speedRatio > 0.75;
+          const freq = isSprinting ? 13.5 : (entity.isPlayer ? 9.5 : 6.8);
+          const amp = isSprinting ? 0.95 : 0.62;
+          const stride = Math.sin(t * freq);
+
+          bodyY = 0.72 + Math.abs(Math.cos(t * freq)) * (isSprinting ? 0.08 : 0.045);
+          bodyRotX = isSprinting ? 0.18 : (entity.isPlayer ? 0.06 : 0.14);
+          bodyRotZ = Math.cos(t * freq) * 0.04;
+          torsoRotY = stride * (isSprinting ? 0.18 : 0.1);
+
+          lLegX = stride * amp;
+          rLegX = -stride * amp;
+
+          if (entity.isPlayer) {
+            lArmX = -stride * amp * 0.85;
+            rArmX = stride * amp * 0.65 - 0.25; // Carry bat ready
+            lArmZ = 0.12;
+            rArmZ = -0.14;
+          } else {
+            // Classic Zombie outstretched shambling arms!
+            lArmX = -1.42 + Math.sin(t * freq * 0.5) * 0.14;
+            rArmX = -1.36 + Math.cos(t * freq * 0.5) * 0.14;
+            lArmZ = 0.12 + Math.sin(t * 3) * 0.05;
+            rArmZ = -0.12 - Math.cos(t * 3) * 0.05;
+            headRotZ = Math.sin(t * 3.5) * 0.12;
+          }
+        } else {
+          // `idle` breathing animation
+          const breath = Math.sin(t * 2.6);
+          bodyY = 0.72 + breath * 0.018;
+          headRotY = Math.sin(t * 1.3) * 0.08;
+          headRotX = breath * 0.03;
+
+          if (entity.isPlayer) {
+            lArmZ = 0.1 + breath * 0.03;
+            rArmZ = -0.1 - breath * 0.03;
+            rArmX = -0.22 + breath * 0.04;
+          } else {
+            lArmX = -1.35 + breath * 0.08;
+            rArmX = -1.3 + breath * 0.08;
+          }
+        }
+      }
+
+      // Apply smooth interpolation to rig bones
+      rig.bodyPivot.position.y = THREE.MathUtils.lerp(rig.bodyPivot.position.y, bodyY, lerpRate);
+      rig.bodyPivot.rotation.x = THREE.MathUtils.lerp(rig.bodyPivot.rotation.x, bodyRotX, lerpRate);
+      rig.bodyPivot.rotation.y = THREE.MathUtils.lerp(rig.bodyPivot.rotation.y, bodyRotY, lerpRate);
+      rig.bodyPivot.rotation.z = THREE.MathUtils.lerp(rig.bodyPivot.rotation.z, bodyRotZ, lerpRate);
+
+      rig.torsoGroup.rotation.y = THREE.MathUtils.lerp(rig.torsoGroup.rotation.y, torsoRotY, lerpRate);
+      rig.headPivot.rotation.x = THREE.MathUtils.lerp(rig.headPivot.rotation.x, headRotX, lerpRate);
+      rig.headPivot.rotation.y = THREE.MathUtils.lerp(rig.headPivot.rotation.y, headRotY, lerpRate);
+
+      rig.leftArm.rotation.x = THREE.MathUtils.lerp(rig.leftArm.rotation.x, lArmX, lerpRate);
+      rig.leftArm.rotation.y = THREE.MathUtils.lerp(rig.leftArm.rotation.y, lArmY, lerpRate);
+      rig.leftArm.rotation.z = THREE.MathUtils.lerp(rig.leftArm.rotation.z, lArmZ, lerpRate);
+
+      rig.rightArm.rotation.x = THREE.MathUtils.lerp(rig.rightArm.rotation.x, rArmX, lerpRate);
+      rig.rightArm.rotation.y = THREE.MathUtils.lerp(rig.rightArm.rotation.y, rArmY, lerpRate);
+      rig.rightArm.rotation.z = THREE.MathUtils.lerp(rig.rightArm.rotation.z, rArmZ, lerpRate);
+
+      rig.leftLeg.rotation.x = THREE.MathUtils.lerp(rig.leftLeg.rotation.x, lLegX, lerpRate);
+      rig.leftLeg.rotation.z = THREE.MathUtils.lerp(rig.leftLeg.rotation.z, lLegZ, lerpRate);
+      rig.rightLeg.rotation.x = THREE.MathUtils.lerp(rig.rightLeg.rotation.x, rLegX, lerpRate);
+      rig.rightLeg.rotation.z = THREE.MathUtils.lerp(rig.rightLeg.rotation.z, rLegZ, lerpRate);
+    }
+
+    // ----------------------------------------------------------------------------
+    // 4. THREE.JS SCENE, LIGHTING & LOW-POLY SURVIVAL ARENA
+    // ----------------------------------------------------------------------------
+    const mountEl = document.getElementById('canvas-mount');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#1e293b');
+    scene.fog = new THREE.FogExp2('#1e293b', 0.017);
+
+    const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 140);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    mountEl.appendChild(renderer.domElement);
+
+    // Three-point + Hemisphere Atmospheric Lighting
+    const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x334155, 0.72);
+    hemiLight.position.set(0, 25, 0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.15);
+    dirLight.position.set(16, 28, 18);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 2;
+    dirLight.shadow.camera.far = 75;
+    const shadowBound = 24;
+    dirLight.shadow.camera.left = -shadowBound;
+    dirLight.shadow.camera.right = shadowBound;
+    dirLight.shadow.camera.top = shadowBound;
+    dirLight.shadow.camera.bottom = -shadowBound;
+    dirLight.shadow.bias = -0.0005;
+    scene.add(dirLight);
+
+    // Subtle cool rim light
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.45);
+    rimLight.position.set(-18, 12, -16);
+    scene.add(rimLight);
+
+    // Build Low-Poly Blocky Park / Plaza Arena
+    const ARENA_RADIUS = 20;
+    const obstacles = []; // { x, z, radius } for smooth sliding collision
+
+    function buildArenaEnvironment() {
+      // Checkerboard stylized grass & stone courtyard tiles
+      const tileSize = 4;
+      const gridCount = 12;
+      const grassA = new THREE.MeshStandardMaterial({ color: 0x3f6212, roughness: 0.9 });
+      const grassB = new THREE.MeshStandardMaterial({ color: 0x4d7c0f, roughness: 0.9 });
+      const plazaMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85 });
+      const plazaTrimMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8 });
+
+      const tileGeo = new THREE.BoxGeometry(tileSize, 0.4, tileSize);
+
+      for (let gx = -gridCount / 2; gx < gridCount / 2; gx++) {
+        for (let gz = -gridCount / 2; gz < gridCount / 2; gz++) {
+          const x = (gx + 0.5) * tileSize;
+          const z = (gz + 0.5) * tileSize;
+          const distFromCenter = Math.hypot(x, z);
+
+          let mat = (gx + gz) % 2 === 0 ? grassA : grassB;
+          if (distFromCenter < 11) {
+            mat = (gx + gz) % 2 === 0 ? plazaMat : plazaTrimMat;
+          }
+
+          const tile = new THREE.Mesh(tileGeo, mat);
+          tile.position.set(x, -0.2, z);
+          tile.receiveShadow = true;
+          scene.add(tile);
+        }
+      }
+
+      // Perimeter Low Concrete Retaining Wall & Bollards
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+      const hazardMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 });
+      const segments = 32;
+      for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const wx = Math.cos(angle) * (ARENA_RADIUS + 1.2);
+        const wz = Math.sin(angle) * (ARENA_RADIUS + 1.2);
+
+        const post = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.3, 1.4), i % 2 === 0 ? wallMat : hazardMat);
+        post.position.set(wx, 0.65, wz);
+        post.rotation.y = -angle;
+        post.castShadow = true;
+        post.receiveShadow = true;
+        scene.add(post);
+      }
+
+      // Decorative Blocky Trees around the outer ring
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
+      const treeCoords = [
+        [-15, -14], [15, -15], [-16, 13], [15, 14],
+        [0, -17.5], [-17.5, 0], [17.5, 0], [0, 17.5]
+      ];
+      treeCoords.forEach(([tx, tz]) => {
+        const tree = new THREE.Group();
+        tree.position.set(tx, 0, tz);
+
+        const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.4, 0.9), trunkMat);
+        trunk.position.y = 1.2;
+        trunk.castShadow = true;
+        tree.add(trunk);
+
+        const crown1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.0, 2.8), leafMat);
+        crown1.position.y = 3.1;
+        crown1.castShadow = true;
+        tree.add(crown1);
+
+        const crown2 = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.4, 1.9), leafMat);
+        crown2.position.y = 4.5;
+        crown2.castShadow = true;
+        tree.add(crown2);
+
+        scene.add(tree);
+        obstacles.push({ x: tx, z: tz, radius: 0.95 });
+      });
+
+      // Tactical Wooden Crates & Streetlamps inside the arena
+      const crateMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.75 });
+      const crateCoords = [
+        [-7.5, -6.5], [8.0, -7.0], [-7.0, 7.5], [7.5, 7.0]
+      ];
+      crateCoords.forEach(([cx, cz]) => {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), crateMat);
+        crate.position.set(cx, 0.75, cz);
+        crate.castShadow = true;
+        crate.receiveShadow = true;
+        scene.add(crate);
+        obstacles.push({ x: cx, z: cz, radius: 1.05 });
+      });
+
+      // Warm Glowing Streetlamps
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.5, roughness: 0.4 });
+      const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+      const lampCoords = [[-11, -11], [11, -11], [-11, 11], [11, 11]];
+      lampCoords.forEach(([lx, lz]) => {
+        const lamp = new THREE.Group();
+        lamp.position.set(lx, 0, lz);
+
+        const pole = new THREE.Mesh(new THREE.BoxGeometry(0.28, 4.6, 0.28), poleMat);
+        pole.position.y = 2.3;
+        pole.castShadow = true;
+        lamp.add(pole);
+
+        const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.75, 0.75), bulbMat);
+        lantern.position.y = 4.8;
+        lamp.add(lantern);
+
+        const pointLight = new THREE.PointLight(0xfde047, 0.65, 12);
+        pointLight.position.y = 4.6;
+        lamp.add(pointLight);
+
+        scene.add(lamp);
+        obstacles.push({ x: lx, z: lz, radius: 0.55 });
+      });
+    }
+
+    buildArenaEnvironment();
+
+    // ----------------------------------------------------------------------------
+    // 5. OVERHEAD BILLBOARDED LIFE METERS & FLOATING DAMAGE NUMBERS
+    // ----------------------------------------------------------------------------
+    const healthBarsContainer = document.getElementById('health-bars-container');
+    const damagePopupsContainer = document.getElementById('damage-popups-container');
+
+    function createOverheadHealthBar(label, isPlayer = false, isBrute = false) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'hp-tag';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'hp-name';
+      nameEl.textContent = label;
+      if (isPlayer) nameEl.style.color = '#7dd3fc';
+      if (isBrute) nameEl.style.color = '#fdba74';
+
+      const outer = document.createElement('div');
+      outer.className = `hp-bar-outer ${isPlayer ? 'player-bar' : ''} ${isBrute ? 'brute-bar' : ''}`;
+
+      const trail = document.createElement('div');
+      trail.className = 'hp-bar-trail';
+      trail.style.width = '100%';
+
+      const fill = document.createElement('div');
+      fill.className = 'hp-bar-fill';
+      fill.style.width = '100%';
+
+      outer.appendChild(trail);
+      outer.appendChild(fill);
+      wrapper.appendChild(nameEl);
+      wrapper.appendChild(outer);
+      healthBarsContainer.appendChild(wrapper);
+
+      return { wrapper, fill, trail, nameEl };
+    }
+
+    function updateOverheadHealthBar(entity, headWorldOffset = 2.25) {
+      if (!entity.hpBar) return;
+      const { wrapper, fill, trail } = entity.hpBar;
+
+      if (entity.state === 'die' && entity.deathFade > 0.6) {
+        wrapper.style.opacity = '0';
+        return;
+      }
+
+      const pct = Math.max(0, Math.min(100, (entity.hp / entity.maxHp) * 100));
+      fill.style.width = `${pct}%`;
+      trail.style.width = `${pct}%`;
+
+      if (pct > 55) {
+        fill.style.backgroundColor = entity.isPlayer ? '#38bdf8' : '#22c55e';
+      } else if (pct > 25) {
+        fill.style.backgroundColor = '#eab308';
+      } else {
+        fill.style.backgroundColor = '#ef4444';
+      }
+
+      // Project 3D position directly above character's head to 2D viewport
+      const worldPos = entity.rig.root.position.clone();
+      worldPos.y += headWorldOffset * (entity.scale || 1);
+      worldPos.project(camera);
+
+      // Hide if behind camera
+      if (worldPos.z > 1) {
+        wrapper.style.display = 'none';
+        return;
+      }
+
+      const x = (worldPos.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-(worldPos.y * 0.5) + 0.5) * window.innerHeight;
+
+      wrapper.style.display = 'flex';
+      wrapper.style.left = `${x.toFixed(1)}px`;
+      wrapper.style.top = `${y.toFixed(1)}px`;
+    }
+
+    function spawnFloatingText(worldPos, text, color = '#ffffff', sizePx = 18) {
+      const projected = worldPos.clone().project(camera);
+      if (projected.z > 1) return;
+
+      const x = (projected.x * 0.5 + 0.5) * window.innerWidth + (Math.random() - 0.5) * 24;
+      const y = (-(projected.y * 0.5) + 0.5) * window.innerHeight;
+
+      const el = document.createElement('div');
+      el.className = 'dmg-float';
+      el.textContent = text;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.style.color = color;
+      el.style.fontSize = `${sizePx}px`;
+
+      damagePopupsContainer.appendChild(el);
+      setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 860);
+    }
+
+    // ----------------------------------------------------------------------------
+    // 6. GAME STATE, PLAYER, ZOMBIES, PARTICLES & PICKUPS
+    // ----------------------------------------------------------------------------
+    const gameState = {
+      status: 'start', // 'start', 'playing', 'gameover'
+      wave: 1,
+      score: 0,
+      kills: 0,
+      combo: 0,
+      comboTimer: 0,
+      hitStopTimer: 0,
+      shakeIntensity: 0,
+      cameraAngle: 0,
+      cameraPitchMode: 0, // 0 = Isometric Action, 1 = Closer Over-Shoulder
+      zombiesToSpawn: 0,
+      spawnCooldown: 0
+    };
+
+    // Player Entity (Girl Survivor)
+    const player = {
+      isPlayer: true,
+      rig: createBlockyCharacterRig({ isPlayer: true, scale: 1.0 }),
+      hp: 100,
+      maxHp: 100,
+      hpBar: null,
+      state: 'idle',
+      stateTimer: 0,
+      stateDuration: 0.35,
+      comboStep: 0, // Cycles 1 (right slash) -> 2 (left slash) -> 3 (heavy kick)
+      comboResetTimer: 0,
+      attackDealtDamage: false,
+      invulnTimer: 0,
+      speedRatio: 0,
+      animOffset: 0,
+      scale: 1.0,
+      deathFade: 0
+    };
+    scene.add(player.rig.root);
+    player.hpBar = createOverheadHealthBar('SURVIVOR', true, false);
+
+    // Active Zombies, Particles, and Health Pickups
+    let zombies = [];
+    let particles = [];
+    let pickups = [];
+
+    function clearDynamicEntities() {
+      zombies.forEach(z => {
+        scene.remove(z.rig.root);
+        if (z.hpBar && z.hpBar.wrapper.parentNode) {
+          z.hpBar.wrapper.parentNode.removeChild(z.hpBar.wrapper);
+        }
+      });
+      zombies = [];
+
+      particles.forEach(p => scene.remove(p.mesh));
+      particles = [];
+
+      pickups.forEach(pk => scene.remove(pk.mesh));
+      pickups = [];
+    }
+
+    function spawnBurstParticles(pos, colorHex, count = 10) {
+      const geo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+      const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+      for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        mesh.position.y += 0.9;
+        scene.add(mesh);
+
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2.5 + Math.random() * 5.5;
+        particles.push({
+          mesh,
+          vx: Math.cos(angle) * speed,
+          vy: 3.5 + Math.random() * 4.5,
+          vz: Math.sin(angle) * speed,
+          life: 0.45 + Math.random() * 0.25
+        });
+      }
+    }
+
+    function spawnHealthPickup(pos) {
+      const group = new THREE.Group();
+      group.position.set(pos.x, 0.55, pos.z);
+
+      const crossMat = new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        emissive: 0x059669,
+        emissiveIntensity: 0.5
+      });
+      const barH = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.2, 0.2), crossMat);
+      const barV = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.55, 0.2), crossMat);
+      group.add(barH, barV);
+      scene.add(group);
+
+      pickups.push({
+        mesh: group,
+        life: 14.0
+      });
+    }
+
+    function spawnZombie(waveNum) {
+      // Determine zombie archetype based on wave progression
+      let variant = 'normal';
+      let maxHp = 45 + waveNum * 8;
+      let moveSpeed = 3.1 + Math.min(1.6, waveNum * 0.15);
+      let damage = 12 + Math.floor(waveNum * 1.5);
+      let scale = 1.0;
+      let label = 'ZOMBIE';
+
+      const roll = Math.random();
+      if (waveNum >= 2 && roll < 0.28) {
+        variant = 'runner';
+        maxHp = 32 + waveNum * 5;
+        moveSpeed = 5.1 + Math.min(1.8, waveNum * 0.15);
+        damage = 10 + waveNum;
+        scale = 0.94;
+        label = 'RUNNER';
+      } else if (waveNum >= 3 && roll > 0.78) {
+        variant = 'brute';
+        maxHp = 115 + waveNum * 22;
+        moveSpeed = 2.25 + Math.min(0.8, waveNum * 0.08);
+        damage = 22 + waveNum * 2;
+        scale = 1.32;
+        label = 'BRUTE';
+      }
+
+      // Spawn along perimeter ring away from player
+      const spawnAngle = Math.random() * Math.PI * 2;
+      const spawnDist = ARENA_RADIUS - 0.8;
+      const sx = Math.cos(spawnAngle) * spawnDist;
+      const sz = Math.sin(spawnAngle) * spawnDist;
+
+      const rig = createBlockyCharacterRig({
+        isPlayer: false,
+        variant,
+        scale
+      });
+      rig.root.position.set(sx, 0, sz);
+      scene.add(rig.root);
+
+      const hpBar = createOverheadHealthBar(label, false, variant === 'brute');
+
+      zombies.push({
+        isPlayer: false,
+        variant,
+        rig,
+        hp: maxHp,
+        maxHp,
+        hpBar,
+        moveSpeed,
+        damage,
+        scale,
+        state: 'walk',
+        stateTimer: 0,
+        stateDuration: 0.65,
+        attackDealtDamage: false,
+        attackCooldown: 0.4,
+        knockbackVel: new THREE.Vector3(),
+        flashTimer: 0,
+        speedRatio: 0.6,
+        animOffset: Math.random() * 10,
+        deathFade: 0
+      });
+    }
+
+    // ----------------------------------------------------------------------------
+    // 7. INPUT HANDLING (KEYBOARD, MOUSE CLICK/DRAG & TOUCH JOYSTICK)
+    // ----------------------------------------------------------------------------
+    const keys = {};
+    let joystickVec = { x: 0, y: 0 };
+    let isDraggingCamera = false;
+    let lastPointerX = 0;
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if ((e.code === 'Space' || e.code === 'KeyJ' || e.code === 'KeyZ') && gameState.status === 'playing') {
+        e.preventDefault();
+        triggerPlayerAttack();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    // Mouse Click to Attack & Drag to Orbit Camera
+    const canvasEl = renderer.domElement;
+    let pointerDownPos = { x: 0, y: 0 };
+
+    canvasEl.addEventListener('mousedown', (e) => {
+      if (gameState.status !== 'playing') return;
+      isDraggingCamera = true;
+      lastPointerX = e.clientX;
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDraggingCamera) return;
+      const dx = e.clientX - lastPointerX;
+      gameState.cameraAngle -= dx * 0.007;
+      lastPointerX = e.clientX;
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (isDraggingCamera) {
+        const distMoved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+        if (distMoved < 8 && gameState.status === 'playing') {
+          triggerPlayerAttack();
+        }
+      }
+      isDraggingCamera = false;
+    });
+
+    // Touch Joystick Setup
+    const joystickZone = document.getElementById('joystick-zone');
+    const joystickKnob = document.getElementById('joystick-knob');
+    let joystickTouchId = null;
+
+    joystickZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.changedTouches[0];
+      joystickTouchId = touch.identifier;
+      updateJoystick(touch);
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          updateJoystick(e.changedTouches[i]);
+        }
+      }
+    }, { passive: false });
+
+    const resetJoystick = (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          joystickTouchId = null;
+          joystickVec = { x: 0, y: 0 };
+          joystickKnob.style.transform = 'translate(0px, 0px)';
+        }
+      }
+    };
+    joystickZone.addEventListener('touchend', resetJoystick);
+    joystickZone.addEventListener('touchcancel', resetJoystick);
+
+    function updateJoystick(touch) {
+      const rect = joystickZone.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const maxRadius = rect.width * 0.36;
+
+      let dx = touch.clientX - centerX;
+      let dy = touch.clientY - centerY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > maxRadius) {
+        dx = (dx / dist) * maxRadius;
+        dy = (dy / dist) * maxRadius;
+      }
+      joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      joystickVec.x = dx / maxRadius;
+      joystickVec.y = dy / maxRadius;
+    }
+
+    document.getElementById('mobile-attack-btn').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (gameState.status === 'playing') triggerPlayerAttack();
+    }, { passive: false });
+
+    // ----------------------------------------------------------------------------
+    // 8. COMBAT SYSTEM (GIRL 3-HIT COMBO & ZOMBIE LUNGES)
+    // ----------------------------------------------------------------------------
+    function triggerPlayerAttack() {
+      if (player.state === 'die') return;
+      // Allow buffering next combo strike slightly before previous finishes
+      if (player.state.startsWith('attack-') && player.stateTimer < player.stateDuration * 0.58) {
+        return;
+      }
+
+      player.comboStep = (player.comboStep % 3) + 1;
+      player.comboResetTimer = 1.15;
+      player.stateTimer = 0;
+      player.attackDealtDamage = false;
+
+      if (player.comboStep === 1) {
+        player.state = 'attack-melee-right';
+        player.stateDuration = 0.32;
+      } else if (player.comboStep === 2) {
+        player.state = 'attack-melee-left';
+        player.stateDuration = 0.32;
+      } else {
+        player.state = 'attack-kick';
+        player.stateDuration = 0.42;
+      }
+
+      // Auto-assist aim toward nearest zombie in front or close range
+      let bestTarget = null;
+      let bestDist = 3.6;
+      const pPos = player.rig.root.position;
+      zombies.forEach(z => {
+        if (z.state === 'die') return;
+        const d = pPos.distanceTo(z.rig.root.position);
+        if (d < bestDist) {
+          bestDist = d;
+          bestTarget = z;
+        }
+      });
+
+      if (bestTarget) {
+        const dx = bestTarget.rig.root.position.x - pPos.x;
+        const dz = bestTarget.rig.root.position.z - pPos.z;
+        player.rig.root.rotation.y = Math.atan2(dx, dz);
+      }
+
+      // Small forward lunge step on attack
+      const forward = new THREE.Vector3(
+        Math.sin(player.rig.root.rotation.y),
+        0,
+        Math.cos(player.rig.root.rotation.y)
+      );
+      moveWithCollision(player.rig.root.position, forward.multiplyScalar(0.38), 0.55);
+
+      sfx.playSwing(player.comboStep);
+    }
+
+    function executePlayerMeleeHitbox() {
+      const isKick = player.state === 'attack-kick';
+      const reach = isKick ? 2.75 : 2.55;
+      const baseDamage = isKick ? 34 : (player.comboStep === 2 ? 22 : 19);
+      const knockbackForce = isKick ? 13.5 : 6.8;
+
+      const pPos = player.rig.root.position;
+      const pForward = new THREE.Vector3(
+        Math.sin(player.rig.root.rotation.y),
+        0,
+        Math.cos(player.rig.root.rotation.y)
+      );
+
+      let hitAny = false;
+
+      zombies.forEach(z => {
+        if (z.state === 'die') return;
+        const toZombie = new THREE.Vector3().subVectors(z.rig.root.position, pPos);
+        toZombie.y = 0;
+        const dist = toZombie.length();
+
+        if (dist <= reach + (z.scale - 1) * 0.4) {
+          const dir = toZombie.clone().normalize();
+          const dot = pForward.dot(dir);
+          // Generous 150-degree frontal cleave arc
+          if (dot > -0.25 || dist < 1.1) {
+            hitAny = true;
+            const dmg = baseDamage + Math.floor(Math.random() * 5);
+            damageZombie(z, dmg, dir, knockbackForce, isKick);
+          }
+        }
+      });
+
+      if (hitAny) {
+        sfx.playHitZombie(isKick);
+        gameState.hitStopTimer = isKick ? 0.045 : 0.025;
+        gameState.shakeIntensity = isKick ? 0.35 : 0.16;
+      }
+    }
+
+    function damageZombie(z, amount, knockDir, knockForce, isCritical) {
+      z.hp = Math.max(0, z.hp - amount);
+      z.flashTimer = 0.12;
+      z.knockbackVel.copy(knockDir).multiplyScalar(knockForce);
+
+      // Update combo & score
+      gameState.combo += 1;
+      gameState.comboTimer = 3.0;
+      const points = amount * (1 + Math.floor(gameState.combo / 5));
+      gameState.score += points;
+
+      spawnBurstParticles(z.rig.root.position, isCritical ? 0xfbbf24 : 0x84cc16, isCritical ? 12 : 7);
+      spawnFloatingText(
+        z.rig.root.position.clone().add(new THREE.Vector3(0, 2.1 * z.scale, 0)),
+        isCritical ? `KICK! -${amount}` : `-${amount}`,
+        isCritical ? '#fbbf24' : '#ffffff',
+        isCritical ? 21 : 17
+      );
+
+      if (z.hp <= 0 && z.state !== 'die') {
+        z.state = 'die';
+        z.stateTimer = 0;
+        z.deathFade = 0;
+        gameState.kills += 1;
+        gameState.score += z.variant === 'brute' ? 250 : 100;
+        sfx.playZombieDie();
+
+        // Chance to drop healing heart orb
+        if (Math.random() < 0.24 && player.hp < player.maxHp) {
+          spawnHealthPickup(z.rig.root.position);
+        }
+      }
+
+      updateHUD();
+    }
+
+    function damagePlayer(amount, attackerPos) {
+      if (player.invulnTimer > 0 || player.state === 'die') return;
+
+      player.hp = Math.max(0, player.hp - amount);
+      player.invulnTimer = 0.65;
+      gameState.shakeIntensity = 0.32;
+      gameState.combo = 0;
+      sfx.playPlayerHurt();
+
+      // Knockback slightly away from zombie
+      const push = new THREE.Vector3().subVectors(player.rig.root.position, attackerPos);
+      push.y = 0;
+      if (push.lengthSq() > 0.001) {
+        push.normalize().multiplyScalar(0.55);
+        moveWithCollision(player.rig.root.position, push, 0.55);
+      }
+
+      spawnBurstParticles(player.rig.root.position, 0xf43f5e, 9);
+      spawnFloatingText(
+        player.rig.root.position.clone().add(new THREE.Vector3(0, 2.2, 0)),
+        `-${amount}`,
+        '#fb7185',
+        20
+      );
+
+      if (player.hp <= 0) {
+        player.hp = 0;
+        player.state = 'die';
+        player.stateTimer = 0;
+        setTimeout(() => {
+          triggerGameOver();
+        }, 1250);
+      }
+
+      updateHUD();
+    }
+
+    // ----------------------------------------------------------------------------
+    // 9. COLLISION & MOVEMENT HELPERS
+    // ----------------------------------------------------------------------------
+    function moveWithCollision(pos, deltaVec, entityRadius = 0.5) {
+      pos.x += deltaVec.x;
+      pos.z += deltaVec.z;
+
+      // Arena circular boundary clamp
+      const distFromCenter = Math.hypot(pos.x, pos.z);
+      const maxAllowed = ARENA_RADIUS - entityRadius;
+      if (distFromCenter > maxAllowed) {
+        pos.x = (pos.x / distFromCenter) * maxAllowed;
+        pos.z = (pos.z / distFromCenter) * maxAllowed;
+      }
+
+      // Push out from obstacles (crates, trees, lamps)
+      for (let i = 0; i < obstacles.length; i++) {
+        const obs = obstacles[i];
+        const dx = pos.x - obs.x;
+        const dz = pos.z - obs.z;
+        const d = Math.hypot(dx, dz);
+        const minSep = entityRadius + obs.radius;
+        if (d < minSep && d > 0.0001) {
+          const overlap = minSep - d;
+          pos.x += (dx / d) * overlap;
+          pos.z += (dz / d) * overlap;
+        }
+      }
+    }
+
+    // ----------------------------------------------------------------------------
+    // 10. WAVE MANAGER & HUD UPDATES
+    // ----------------------------------------------------------------------------
+    const hudWave = document.getElementById('hud-wave');
+    const hudKills = document.getElementById('hud-kills');
+    const hudScore = document.getElementById('hud-score');
+    const comboBadge = document.getElementById('combo-badge');
+    const comboCount = document.getElementById('combo-count');
+    const waveBanner = document.getElementById('wave-banner');
+    const waveBannerTitle = document.getElementById('wave-banner-title');
+    const waveBannerSub = document.getElementById('wave-banner-sub');
+
+    function updateHUD() {
+      hudWave.textContent = gameState.wave;
+      hudKills.textContent = gameState.kills;
+      hudScore.textContent = gameState.score.toLocaleString();
+
+      if (gameState.combo >= 2) {
+        comboBadge.classList.remove('hidden');
+        comboCount.textContent = `${gameState.combo}x COMBO!`;
+      } else {
+        comboBadge.classList.add('hidden');
+      }
+    }
+
+    function startWave(waveNum) {
+      gameState.wave = waveNum;
+      gameState.zombiesToSpawn = 4 + waveNum * 3;
+      gameState.spawnCooldown = 0.4;
+      updateHUD();
+      sfx.playWaveStart();
+
+      waveBannerTitle.textContent = `WAVE ${waveNum}`;
+      waveBannerSub.textContent = waveNum === 1
+        ? 'Defend the Plaza!'
+        : waveNum % 3 === 0
+          ? 'Warning: Heavy Zombie Brutes Incoming!'
+          : `${gameState.zombiesToSpawn} Zombies Approaching!`;
+
+      waveBanner.classList.remove('hidden', 'wave-banner-anim');
+      void waveBanner.offsetWidth; // Force reflow to restart animation
+      waveBanner.classList.add('wave-banner-anim');
+    }
+
+    function startNewGame() {
+      sfx.init();
+      clearDynamicEntities();
+
+      gameState.status = 'playing';
+      gameState.wave = 1;
+      gameState.score = 0;
+      gameState.kills = 0;
+      gameState.combo = 0;
+      gameState.comboTimer = 0;
+      gameState.hitStopTimer = 0;
+      gameState.shakeIntensity = 0;
+
+      player.hp = player.maxHp;
+      player.state = 'idle';
+      player.stateTimer = 0;
+      player.comboStep = 0;
+      player.invulnTimer = 0;
+      player.deathFade = 0;
+      player.rig.root.position.set(0, 0, 0);
+      player.rig.root.rotation.set(0, 0, 0);
+      player.hpBar.wrapper.style.opacity = '1';
+
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.add('hidden');
+
+      startWave(1);
+    }
+
+    function triggerGameOver() {
+      gameState.status = 'gameover';
+      document.getElementById('final-wave').textContent = gameState.wave;
+      document.getElementById('final-kills').textContent = gameState.kills;
+      document.getElementById('final-score').textContent = gameState.score.toLocaleString();
+      document.getElementById('gameover-screen').classList.remove('hidden');
+    }
+
+    // Button Event Listeners
+    document.getElementById('btn-start').addEventListener('click', startNewGame);
+    document.getElementById('btn-restart').addEventListener('click', startNewGame);
+
+    document.getElementById('btn-mute').addEventListener('click', () => {
+      sfx.init();
+      const muted = sfx.toggleMute();
+      document.getElementById('icon-sound-on').classList.toggle('hidden', muted);
+      document.getElementById('icon-sound-off').classList.toggle('hidden', !muted);
+    });
+
+    document.getElementById('btn-camera').addEventListener('click', () => {
+      gameState.cameraPitchMode = (gameState.cameraPitchMode + 1) % 2;
+    });
+
+    // ----------------------------------------------------------------------------
+    // 11. MAIN SIMULATION & RENDER LOOP
+    // ----------------------------------------------------------------------------
+    const clock = new THREE.Clock();
+
+    function updateSimulation(dt, elapsedTime) {
+      // Hit-stop freeze frame for visceral melee impact
+      if (gameState.hitStopTimer > 0) {
+        gameState.hitStopTimer -= dt;
+        return;
+      }
+
+      // Combo decay
+      if (gameState.combo > 0) {
+        gameState.comboTimer -= dt;
+        if (gameState.comboTimer <= 0) {
+          gameState.combo = 0;
+          updateHUD();
+        }
+      }
+
+      // Spawn Wave Zombies gradually
+      if (gameState.status === 'playing') {
+        if (gameState.zombiesToSpawn > 0) {
+          gameState.spawnCooldown -= dt;
+          if (gameState.spawnCooldown <= 0) {
+            spawnZombie(gameState.wave);
+            gameState.zombiesToSpawn -= 1;
+            gameState.spawnCooldown = Math.max(0.45, 1.35 - gameState.wave * 0.08);
+          }
+        } else if (zombies.length === 0) {
+          // Wave cleared! Heal player slightly and advance wave
+          if (player.hp > 0 && player.hp < player.maxHp) {
+            player.hp = Math.min(player.maxHp, player.hp + 15);
+            spawnFloatingText(
+              player.rig.root.position.clone().add(new THREE.Vector3(0, 2.3, 0)),
+              '+15 WAVE BONUS',
+              '#34d399',
+              16
+            );
+          }
+          startWave(gameState.wave + 1);
+        }
+      }
+
+      // --- UPDATE PLAYER ---
+      if (player.invulnTimer > 0) {
+        player.invulnTimer -= dt;
+        player.rig.root.visible = Math.floor(player.invulnTimer * 24) % 2 === 0;
+      } else {
+        player.rig.root.visible = true;
+      }
+
+      if (player.comboResetTimer > 0) {
+        player.comboResetTimer -= dt;
+        if (player.comboResetTimer <= 0) player.comboStep = 0;
+      }
+
+      if (player.state === 'die') {
+        player.stateTimer += dt;
+        player.deathFade = Math.min(1, player.stateTimer / 1.2);
+      } else if (player.state.startsWith('attack-')) {
+        player.stateTimer += dt;
+        // Deal hit damage at the peak of the swing/kick
+        if (!player.attackDealtDamage && player.stateTimer >= player.stateDuration * 0.42) {
+          player.attackDealtDamage = true;
+          executePlayerMeleeHitbox();
+        }
+        if (player.stateTimer >= player.stateDuration) {
+          player.state = 'idle';
+          player.stateTimer = 0;
+        }
+      } else if (gameState.status === 'playing') {
+        // Movement input relative to camera orbit angle
+        let moveX = 0;
+        let moveZ = 0;
+        if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
+        if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
+        if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+        if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+        if (Math.hypot(joystickVec.x, joystickVec.y) > 0.1) {
+          moveX = joystickVec.x;
+          moveZ = joystickVec.y;
+        }
+
+        const inputLen = Math.hypot(moveX, moveZ);
+        if (inputLen > 0.05) {
+          const normX = moveX / Math.max(1, inputLen);
+          const normZ = moveZ / Math.max(1, inputLen);
+
+          // Rotate input by cameraAngle
+          const sinA = Math.sin(gameState.cameraAngle);
+          const cosA = Math.cos(gameState.cameraAngle);
+          const worldDirX = normX * cosA + normZ * sinA;
+          const worldDirZ = -normX * sinA + normZ * cosA;
+
+          const isSprinting = Boolean(keys['ShiftLeft'] || keys['ShiftRight']);
+          const moveSpeed = isSprinting ? 8.2 : 5.6;
+          player.speedRatio = isSprinting ? 1.0 : 0.6;
+          player.state = isSprinting ? 'sprint' : 'walk';
+
+          moveWithCollision(
+            player.rig.root.position,
+            new THREE.Vector3(worldDirX * moveSpeed * dt, 0, worldDirZ * moveSpeed * dt),
+            0.55
+          );
+
+          // Smooth character turn toward movement direction
+          const targetRot = Math.atan2(worldDirX, worldDirZ);
+          let diff = targetRot - player.rig.root.rotation.y;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          player.rig.root.rotation.y += diff * Math.min(1, dt * 16);
+        } else {
+          player.speedRatio = 0;
+          player.state = 'idle';
+        }
+      }
+
+      animateCharacterRig(player, dt, elapsedTime);
+      updateOverheadHealthBar(player, 2.25);
+
+      // --- UPDATE ZOMBIES ---
+      const pPos = player.rig.root.position;
+      for (let i = zombies.length - 1; i >= 0; i--) {
+        const z = zombies[i];
+        const zPos = z.rig.root.position;
+
+        // Hit flash tint
+        if (z.flashTimer > 0) {
+          z.flashTimer -= dt;
+          z.rig.meshes.forEach(m => {
+            if (m.material.emissive) m.material.emissive.setHex(0xffffff);
+          });
+        } else {
+          z.rig.meshes.forEach(m => {
+            if (m.material.emissive) m.material.emissive.setHex(0x000000);
+          });
+        }
+
+        // Apply knockback velocity with friction
+        if (z.knockbackVel.lengthSq() > 0.01) {
+          moveWithCollision(zPos, z.knockbackVel.clone().multiplyScalar(dt), 0.52 * z.scale);
+          z.knockbackVel.multiplyScalar(Math.pow(0.04, dt));
+        }
+
+        if (z.state === 'die') {
+          z.stateTimer += dt;
+          z.deathFade = Math.min(1, z.stateTimer / 1.35);
+          animateCharacterRig(z, dt, elapsedTime);
+          updateOverheadHealthBar(z, 2.25);
+
+          if (z.stateTimer > 1.35) {
+            scene.remove(z.rig.root);
+            if (z.hpBar && z.hpBar.wrapper.parentNode) {
+              z.hpBar.wrapper.parentNode.removeChild(z.hpBar.wrapper);
+            }
+            zombies.splice(i, 1);
+          }
+          continue;
+        }
+
+        if (z.attackCooldown > 0) z.attackCooldown -= dt;
+
+        const toPlayer = new THREE.Vector3().subVectors(pPos, zPos);
+        toPlayer.y = 0;
+        const distToPlayer = toPlayer.length();
+        const attackRange = 1.45 * z.scale;
+
+        if (z.state === 'zombie-attack') {
+          z.stateTimer += dt;
+          if (!z.attackDealtDamage && z.stateTimer >= z.stateDuration * 0.5) {
+            z.attackDealtDamage = true;
+            if (distToPlayer <= attackRange + 0.35 && player.state !== 'die') {
+              damagePlayer(z.damage, zPos);
+            }
+          }
+          if (z.stateTimer >= z.stateDuration) {
+            z.state = 'walk';
+            z.stateTimer = 0;
+            z.attackCooldown = 0.75;
+          }
+        } else if (player.state !== 'die' && gameState.status === 'playing') {
+          if (distToPlayer <= attackRange && z.attackCooldown <= 0) {
+            // Wind up zombie melee attack!
+            z.state = 'zombie-attack';
+            z.stateTimer = 0;
+            z.attackDealtDamage = false;
+            z.speedRatio = 0;
+          } else if (distToPlayer > attackRange * 0.82) {
+            // Pursue the girl
+            z.state = 'walk';
+            z.speedRatio = z.variant === 'runner' ? 0.95 : 0.65;
+            const chaseDir = toPlayer.normalize();
+
+            // Soft separation from neighboring zombies so hordes spread naturally
+            const sep = new THREE.Vector3();
+            for (let j = 0; j < zombies.length; j++) {
+              if (i === j || zombies[j].state === 'die') continue;
+              const diff = new THREE.Vector3().subVectors(zPos, zombies[j].rig.root.position);
+              diff.y = 0;
+              const d = diff.length();
+              if (d < 1.15 && d > 0.001) {
+                sep.add(diff.normalize().multiplyScalar((1.15 - d) * 1.6));
+              }
+            }
+
+            const finalMove = chaseDir.add(sep).normalize().multiplyScalar(z.moveSpeed * dt);
+            moveWithCollision(zPos, finalMove, 0.5 * z.scale);
+
+            const targetYaw = Math.atan2(finalMove.x, finalMove.z);
+            z.rig.root.rotation.y = targetYaw;
+          }
+        } else {
+          z.state = 'idle';
+          z.speedRatio = 0;
+        }
+
+        animateCharacterRig(z, dt, elapsedTime);
+        updateOverheadHealthBar(z, 2.25);
+      }
+
+      // --- UPDATE PICKUPS ---
+      for (let i = pickups.length - 1; i >= 0; i--) {
+        const pk = pickups[i];
+        pk.life -= dt;
+        pk.mesh.rotation.y += dt * 2.5;
+        pk.mesh.position.y = 0.55 + Math.sin(elapsedTime * 4 + i) * 0.12;
+
+        if (pk.mesh.position.distanceTo(pPos) < 1.4 && player.state !== 'die') {
+          const heal = 25;
+          player.hp = Math.min(player.maxHp, player.hp + heal);
+          sfx.playPickup();
+          spawnBurstParticles(pk.mesh.position, 0x10b981, 10);
+          spawnFloatingText(
+            pPos.clone().add(new THREE.Vector3(0, 2.3, 0)),
+            `+${heal} HP`,
+            '#34d399',
+            19
+          );
+          scene.remove(pk.mesh);
+          pickups.splice(i, 1);
+          continue;
+        }
+
+        if (pk.life <= 0) {
+          scene.remove(pk.mesh);
+          pickups.splice(i, 1);
+        }
+      }
+
+      // --- UPDATE PARTICLES ---
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.life -= dt;
+        pt.vy -= 18 * dt;
+        pt.mesh.position.x += pt.vx * dt;
+        pt.mesh.position.y += pt.vy * dt;
+        pt.mesh.position.z += pt.vz * dt;
+        pt.mesh.rotation.x += 8 * dt;
+        pt.mesh.rotation.y += 8 * dt;
+        pt.mesh.scale.setScalar(Math.max(0.01, pt.life * 1.6));
+
+        if (pt.life <= 0 || pt.mesh.position.y < 0) {
+          scene.remove(pt.mesh);
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function updateCamera(dt) {
+      const targetPos = player.rig.root.position;
+      const dist = gameState.cameraPitchMode === 0 ? 13.5 : 9.2;
+      const height = gameState.cameraPitchMode === 0 ? 11.2 : 6.4;
+
+      const camX = targetPos.x + Math.sin(gameState.cameraAngle) * dist;
+      const camZ = targetPos.z + Math.cos(gameState.cameraAngle) * dist;
+      const camY = targetPos.y + height;
+
+      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), Math.min(1, dt * 8));
+
+      // Apply subtle camera shake on heavy hits
+      if (gameState.shakeIntensity > 0.005) {
+        camera.position.x += (Math.random() - 0.5) * gameState.shakeIntensity;
+        camera.position.y += (Math.random() - 0.5) * gameState.shakeIntensity;
+        gameState.shakeIntensity *= Math.pow(0.015, dt);
+      } else {
+        gameState.shakeIntensity = 0;
+      }
+
+      camera.lookAt(targetPos.x, targetPos.y + 1.1, targetPos.z);
+    }
+
+    // Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Start Animation Loop on Window Load
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsedTime = clock.getElapsedTime();
+
+      if (gameState.status === 'start') {
+        // Gentle idle showcase rotation on title screen
+        gameState.cameraAngle += dt * 0.25;
+        animateCharacterRig(player, dt, elapsedTime);
+        updateOverheadHealthBar(player, 2.25);
+      } else {
+        updateSimulation(dt, elapsedTime);
+      }
+
+      updateCamera(dt);
+      renderer.render(scene, camera);
+    }
+
+    window.onload = function () {
+      animate();
+    };
+  </script>
+</body>
+</html>
